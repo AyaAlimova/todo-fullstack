@@ -1,33 +1,113 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+import { useEffect, useState } from 'react'
 import './App.css'
 
+export const BASE_URL = import.meta.env.VITE_BASE_URL
+
 function App() {
-  const [count, setCount] = useState(0)
+
+  const [todos, setTodos] = useState([])
+  const [input, setInput] = useState('')
+
+  useEffect(() => {
+    //make initial request to backend on first render
+    async function test() {
+      const response = await fetch(`${BASE_URL}/todos`)
+      const data = await response.json()
+      console.log('Data from backend:', data); // Check what data is returned
+      console.log(Array.isArray(data)); 
+      setTodos(data)
+      
+    }
+    test()
+  }, [])
+
+  function handleChange(e){
+    setInput(e.target.value)
+
+  }
+  async function handleSubmit(e){
+    //stop the default behavior of page refresh
+    e.preventDefault()
+
+  // format our data on the frontend to match the schema
+    const todo = {
+      text: input
+    }
+    //make the request
+    const response = await fetch(`${BASE_URL}/todos`, {
+      method: 'POST', 
+      body: JSON.stringify(todo),
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+    //format the new todo that now has the id and completed property
+    const newTodo = await response.json()
+    //keep the state in sync with our data
+    setTodos([...todos, newTodo])
+
+    //reset the input to empty
+    setInput('')
+    console.log(newTodo);
+  }
+//the id is the _id of the todo document we want to delete
+  async function handleDelete(id){
+
+    //make the request with the document id in the path (at the end)
+       await fetch(`${BASE_URL}/todos/${id}`,{
+        method: 'DELETE'
+      })
+      //make a copy of the state but also remove the document with the matching id
+      const newTodos = todos.filter(todo => todo._id !== id)
+
+      //update the state with a new array
+      setTodos(newTodos)
+  }
+
+  async function handleComplete(id){
+    
+    let updatedTodo;
+    //use map to make a copy of todos and also change one todo item
+    const updatedTodos = todos.map((todo) => {
+      //find the todo item we want to change using the id
+      if (todo._id === id){
+        //make the change, bu also assign it to a variable we can access (outside of map)
+        updatedTodo = {...todo, completed:!todo.completed}
+        //send the updated todo to the new array ma is generating 
+        return updatedTodo
+      }
+      else {
+        //otherwise keep the todo the same
+        return todo
+      }
+    })
+      await fetch(`${BASE_URL}/todos/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updatedTodo),
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      setTodos(updatedTodos)
+  }
+
 
   return (
     <>
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
+    <h1>Todos:</h1>
+    <ul>
+     {todos.map(todo => 
+       <li key={todo._id}>
+        <input type='checkbox' checked={todo.completed} onChange={() => handleComplete(todo._id)}/>
+        {todo.text}
+        <button onClick={() => handleDelete(todo._id)}>X</button>
+       </li>
+      )}
+     </ul>
+     <form onSubmit={handleSubmit}>
+      <input value = {input} onChange={handleChange}/>
+      <button>Add</button>
+     </form>
     </>
   )
 }
